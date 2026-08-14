@@ -11,6 +11,8 @@ def ping(io):
 
     return result.returncode == 0
 
+# Find local IP
+
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
@@ -20,6 +22,8 @@ local_ip = sock.getsockname()[0]
 
 sock.close()
 
+# Find network
+
 network = ipaddress.ip_network(local_ip + "/24", strict=False)
 
 print("Local IP: ", local_ip)
@@ -27,9 +31,10 @@ print("Network: ", network)
 print("Netmask: ", network.netmask)
 print("Broadcast: ", network.broadcast_address)
 
-ip = "10.145.18.54"
+print("\nScanning...\n")
 
-if ping(ip):
-    print("Online")
-else:
-    print("Offline")
+# Scan hosts
+
+for ip in network.hosts():
+    if ping(ip):
+        print(ip, "Online")
