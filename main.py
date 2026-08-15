@@ -2,14 +2,21 @@ import socket
 import ipaddress
 import subprocess
 
+from concurrent.futures import ThreadPoolExecutor
 
-def ping(io):
+
+def ping(ip):
     result = subprocess.run(
         ["ping", "-n", "1", "-w", "1000", str(ip)],
         stdout=subprocess.DEVNULL
     )
 
     return result.returncode == 0
+
+
+def scan_host(ip):
+    if ping(ip):
+        print(ip, "ONLINE")
 
 # Find local IP
 
@@ -35,6 +42,5 @@ print("\nScanning...\n")
 
 # Scan hosts
 
-for ip in network.hosts():
-    if ping(ip):
-        print(ip, "Online")
+with ThreadPoolExecutor(max_workers=20) as executor:
+    executor.map(scan_host, network.hosts())
