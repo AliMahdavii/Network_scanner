@@ -14,6 +14,18 @@ def ping(ip):
     return result.returncode == 0
 
 
+def get_arp_table():
+    result = subprocess.run(
+        ["arp", "-a"],
+        capture_output=True,
+        text=True
+    )
+
+    lines = result.stdout.splitlines()
+
+    return lines
+
+
 def get_hostname(ip):
     try:
         hostname = socket.gethostbyaddr(str(ip))[0]
@@ -57,5 +69,8 @@ print("\nScanning...\n")
 
 # Scan hosts
 
-with ThreadPoolExecutor(max_workers=20) as executor:
-    executor.map(scan_host, network.hosts())
+# with ThreadPoolExecutor(max_workers=20) as executor:
+# executor.map(scan_host, network.hosts())
+
+for line in get_arp_table():
+    print(line)
