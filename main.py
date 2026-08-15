@@ -14,9 +14,24 @@ def ping(ip):
     return result.returncode == 0
 
 
+def get_hostname(ip):
+    try:
+        hostname = socket.gethostbyaddr(str(ip))[0]
+        return hostname
+    except socket.herror:
+        return "Unknown"
+
+
 def scan_host(ip):
+    hostname = get_hostname(ip)
+
     if ping(ip):
-        print(ip, "ONLINE")
+        print(
+            ip,
+            "ONLINE",
+            "|  Hostname: ",
+            hostname
+        )
 
 # Find local IP
 
