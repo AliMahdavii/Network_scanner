@@ -23,7 +23,21 @@ def get_arp_table():
 
     lines = result.stdout.splitlines()
 
-    return lines
+    arp_table = {}
+
+    for line in lines:
+
+        line = line.strip()
+        parts = line.split()
+
+        if len(parts) >= 3 and parts[2] in ["dynamic", "static"]:
+
+            ip = parts[0]
+            mac = parts[1]
+
+            arp_table[ip] = mac
+
+    return arp_table
 
 
 def get_hostname(ip):
@@ -35,14 +49,20 @@ def get_hostname(ip):
 
 
 def scan_host(ip):
-    hostname = get_hostname(ip)
 
     if ping(ip):
+
+        hostname = get_hostname(ip)
+
+        mac = arp_table.get(str(ip), "Unknown")
+
         print(
             ip,
             "ONLINE",
             "|  Hostname: ",
-            hostname
+            hostname,
+            "|  MAC: ",
+            mac
         )
 
 # Find local IP
@@ -69,8 +89,7 @@ print("\nScanning...\n")
 
 # Scan hosts
 
-# with ThreadPoolExecutor(max_workers=20) as executor:
-# executor.map(scan_host, network.hosts())
+arp_table = get_arp_table()
 
-for line in get_arp_table():
-    print(line)
+with ThreadPoolExecutor(max_workers=20) as executor:
+    executor.map(scan_host, network.hosts())
