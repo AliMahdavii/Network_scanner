@@ -81,6 +81,62 @@ def scan_host(ip):
             "hostname": hostname
         })
 
+
+# Port scanner
+
+common_ports = [
+    21,
+    22,
+    23,
+    25,
+    53,
+    80,
+    110,
+    139,
+    443,
+    445,
+    3389
+]
+
+
+def scan_port(ip, port):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+    sock.settimeout(1)
+
+    result = sock.connect_ex((str(ip), port))
+
+    sock.close()
+
+    return result == 0
+
+
+def scan_port_tread(ip, port):
+    if scan_port(ip, port):
+        return port
+
+    return None
+
+
+def scan_ports(ip):
+
+    open_ports = []
+
+    with ThreadPoolExecutor(max_workers=20) as executor:
+
+        results = executor.map(
+            lambda port: scan_port_tread(ip, port),
+            common_ports
+        )
+
+        for port in results:
+
+            if port is not None:
+                open_ports.append(port)
+
+    return open_ports
+
+
 # Scan network
 
 
@@ -113,13 +169,23 @@ for host in online_hosts:
         "Unknown"
     )
 
+# scan ports
+
+for host in online_hosts:
+
+    ip = host["ip"]
+
+    host["open_ports"] = scan_ports(ip)
+
+
 # Display results
 
 print("IP ADDRESS".ljust(18), end="")
 print("HOSTNAME".ljust(21), end="")
-print("MAC ADDRESS")
+print("MAC ADDRESS".ljust(22), end="")
+print("OPEN PORTS")
 
-print("-" * 65)
+print("-" * 80)
 
 
 for host in online_hosts:
@@ -127,15 +193,16 @@ for host in online_hosts:
     print(
         host["ip"].ljust(18),
         host["hostname"].ljust(21),
-        host["mac"]
+        host["mac"].ljust(22),
+        host["open_ports"]
     )
 
 print()
-print("-" * 65)
+print("-" * 80)
 
 print(
     len(online_hosts),
-    " hosts found"
+    "hosts found"
 )
 
-print("=" * 65)
+print("=" * 80)
