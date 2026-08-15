@@ -4,6 +4,21 @@ import subprocess
 
 from concurrent.futures import ThreadPoolExecutor
 
+# Network
+
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+sock.connect(("8.8.8.8", 80))
+
+local_ip = sock.getsockname()[0]
+
+sock.close()
+
+
+network = ipaddress.ip_network(local_ip + "/24", strict=False)
+
+# Ping
+
 
 def ping(ip):
     result = subprocess.run(
@@ -14,6 +29,16 @@ def ping(ip):
     return result.returncode == 0
 
 
+# Hostname
+def get_hostname(ip):
+    try:
+        hostname = socket.gethostbyaddr(str(ip))[0]
+        return hostname
+    except socket.herror:
+        return "Unknown"
+
+
+# ARP Table
 def get_arp_table():
     result = subprocess.run(
         ["arp", "-a"],
@@ -40,12 +65,9 @@ def get_arp_table():
     return arp_table
 
 
-def get_hostname(ip):
-    try:
-        hostname = socket.gethostbyaddr(str(ip))[0]
-        return hostname
-    except socket.herror:
-        return "Unknown"
+# Host scanner
+
+online_hosts = []
 
 
 def scan_host(ip):
@@ -54,31 +76,19 @@ def scan_host(ip):
 
         hostname = get_hostname(ip)
 
-        mac = arp_table.get(str(ip), "Unknown")
+        online_hosts.append({
+            "ip": str(ip),
+            "hostname": hostname
+        })
 
-        print(
-            ip,
-            "ONLINE",
-            "|  Hostname: ",
-            hostname,
-            "|  MAC: ",
-            mac
-        )
-
-# Find local IP
+# Scan network
 
 
-sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+print("=" * 65)
+print("                            NETWORK SCANNER")
+print("=" * 65)
 
-sock.connect(("8.8.8.8", 80))
-
-local_ip = sock.getsockname()[0]
-
-sock.close()
-
-# Find network
-
-network = ipaddress.ip_network(local_ip + "/24", strict=False)
+print()
 
 print("Local IP: ", local_ip)
 print("Network: ", network)
@@ -87,9 +97,45 @@ print("Broadcast: ", network.broadcast_address)
 
 print("\nScanning...\n")
 
-# Scan hosts
+with ThreadPoolExecutor(max_workers=20) as executor:
+    executor.map(scan_host, network.hosts())
+
+# Get mac addresses
 
 arp_table = get_arp_table()
 
-with ThreadPoolExecutor(max_workers=20) as executor:
-    executor.map(scan_host, network.hosts())
+for host in online_hosts:
+
+    ip = host["ip"]
+
+    host["mac"] = arp_table.get(
+        ip,
+        "Unknown"
+    )
+
+# Display results
+
+print("IP ADDRESS".ljust(18), end="")
+print("HOSTNAME".ljust(21), end="")
+print("MAC ADDRESS")
+
+print("-" * 65)
+
+
+for host in online_hosts:
+
+    print(
+        host["ip"].ljust(18),
+        host["hostname"].ljust(21),
+        host["mac"]
+    )
+
+print()
+print("-" * 65)
+
+print(
+    len(online_hosts),
+    " hosts found"
+)
+
+print("=" * 65)
