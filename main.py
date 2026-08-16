@@ -204,6 +204,46 @@ def grab_banner(ip, port):
         return "Unknown"
 
 
+def grab_http_banner(ip, port):
+    try:
+        sock = socket.socket(
+            socket.AF_INET,
+            socket.SOCK_STREAM
+        )
+
+        sock.timeout(2)
+
+        sock.connect((str(ip), port))
+
+        request = (
+            "HEAD / HTTP/1.0\r\n"
+            f"Host: {ip}\r\n"
+            "Connection: close\r\n"
+            "\r\n"
+        )
+
+        sock.sendall(request.encode())
+
+        response = sock.recv(4096)
+
+        sock.close()
+
+        return response.decode(errors="ignore").strip()
+
+    except (socket.timeout, socket.error):
+        return "Unknown"
+
+
+def detect_service(ip, port):
+
+    service = get_service_name(port)
+
+    if service in ["HTTP", "HTTPS"]:
+        return grab_http_banner(ip, port)
+
+    return grab_banner(ip, port)
+
+
 # Scan network
 
 
@@ -256,7 +296,7 @@ for host in online_hosts:
     for port in host["open_ports"]:
         host["services"][port] = get_service_name(port)
 
-        host["banners"][port] = grab_banner(ip, port)
+        host["banners"][port] = detect_service(ip, port)
 
 
 # Display results
