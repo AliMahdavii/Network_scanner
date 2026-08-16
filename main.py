@@ -132,7 +132,8 @@ common_services = {
     139: "NetBIOS",
     443: "HTTPS",
     445: "SMB",
-    3389: "RDP"
+    3389: "RDP",
+    8080: "HTTP"
 }
 
 
@@ -211,7 +212,7 @@ def grab_http_banner(ip, port):
             socket.SOCK_STREAM
         )
 
-        sock.timeout(2)
+        sock.settimeout(2)
 
         sock.connect((str(ip), port))
 
