@@ -81,22 +81,43 @@ def scan_host(ip):
             "hostname": hostname
         })
 
-
 # Port scanner
 
-common_ports = [
-    21,
-    22,
-    23,
-    25,
-    53,
-    80,
-    110,
-    139,
-    443,
-    445,
-    3389
-]
+def validate_port(port):
+    if 0 <= port <= 65535:
+        return True
+
+    print("\nPort must be between 0 and 65535!\n")
+    return False
+
+def get_port_range():
+
+    while True:
+        try:
+            start_port = int(input("Start port: "))
+
+            if not validate_port(start_port):
+                continue
+
+            break
+
+        except ValueError:
+            print("\nPlease enter a valid number!\n")
+
+    
+    while True:
+        try:
+            end_port = int(input("End port: "))
+
+            if not validate_port(end_port):
+                continue
+
+            break
+
+        except ValueError:
+            print("\nPlease enter a valid number!\n")
+
+    return range(start_port, end_port + 1)
 
 
 def scan_port(ip, port):
@@ -118,7 +139,7 @@ def scan_port_tread(ip, port):
     return None
 
 
-def scan_ports(ip):
+def scan_ports(ip, ports):
 
     open_ports = []
 
@@ -126,7 +147,7 @@ def scan_ports(ip):
 
         results = executor.map(
             lambda port: scan_port_tread(ip, port),
-            common_ports
+            ports
         )
 
         for port in results:
@@ -171,11 +192,17 @@ for host in online_hosts:
 
 # scan ports
 
+ports = get_port_range()
+
+print()
+print("Scanning ports...")
+print()
+
 for host in online_hosts:
 
     ip = host["ip"]
 
-    host["open_ports"] = scan_ports(ip)
+    host["open_ports"] = scan_ports(ip, ports)
 
 
 # Display results
