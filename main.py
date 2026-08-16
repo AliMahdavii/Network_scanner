@@ -83,12 +83,14 @@ def scan_host(ip):
 
 # Port scanner
 
+
 def validate_port(port):
     if 0 <= port <= 65535:
         return True
 
     print("\nPort must be between 0 and 65535!\n")
     return False
+
 
 def get_port_range():
 
@@ -104,7 +106,6 @@ def get_port_range():
         except ValueError:
             print("\nPlease enter a valid number!\n")
 
-    
     while True:
         try:
             end_port = int(input("End port: "))
@@ -118,6 +119,28 @@ def get_port_range():
             print("\nPlease enter a valid number!\n")
 
     return range(start_port, end_port + 1)
+
+
+common_services = {
+    21: "FTP",
+    22: "SSH",
+    23: "Telnet",
+    25: "SMTP",
+    53: "DNS",
+    80: "HTTP",
+    110: "POP3",
+    139: "NetBIOS",
+    443: "HTTPS",
+    445: "SMB",
+    3389: "RDP"
+}
+
+
+def get_service_name(port):
+    return common_services.get(
+        port,
+        "Unknown"
+    )
 
 
 def scan_port(ip, port):
@@ -204,6 +227,11 @@ for host in online_hosts:
 
     host["open_ports"] = scan_ports(ip, ports)
 
+    host["services"] = {}
+
+    for port in host["open_ports"]:
+        host["services"][port] = get_service_name(port)
+
 
 # Display results
 
@@ -220,9 +248,15 @@ for host in online_hosts:
     print(
         host["ip"].ljust(18),
         host["hostname"].ljust(21),
-        host["mac"].ljust(22),
-        host["open_ports"]
+        host["mac"].ljust(22)
     )
+
+    for port, service in host["services"].items():
+        print(
+            " " * 18,
+            f"{port:<6}",
+            service
+        )
 
 print()
 print("-" * 80)
