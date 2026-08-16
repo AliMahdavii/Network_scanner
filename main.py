@@ -181,6 +181,29 @@ def scan_ports(ip, ports):
     return open_ports
 
 
+def grab_banner(ip, port):
+
+    try:
+        sock = socket.socket(
+            socket.AF_INET,
+            socket.SOCK_STREAM
+        )
+
+        sock.settimeout(2)
+
+        sock.connect((str(ip), port))
+
+        banner = sock.recv(1024)
+
+        sock.close()
+
+        return banner.decode(errors="ignore").strip()
+
+    except (socket.timeout, socket.error):
+
+        return "Unknown"
+
+
 # Scan network
 
 
@@ -228,19 +251,21 @@ for host in online_hosts:
     host["open_ports"] = scan_ports(ip, ports)
 
     host["services"] = {}
+    host["banners"] = {}
 
     for port in host["open_ports"]:
         host["services"][port] = get_service_name(port)
+
+        host["banners"][port] = grab_banner(ip, port)
 
 
 # Display results
 
 print("IP ADDRESS".ljust(18), end="")
 print("HOSTNAME".ljust(21), end="")
-print("MAC ADDRESS".ljust(22), end="")
-print("OPEN PORTS")
+print("MAC ADDRESS")
 
-print("-" * 80)
+print("-" * 65)
 
 
 for host in online_hosts:
@@ -252,18 +277,25 @@ for host in online_hosts:
     )
 
     for port, service in host["services"].items():
+
+        banner = host["banners"].get(
+            port,
+            "Unknown"
+        )
         print(
             " " * 18,
             f"{port:<6}",
-            service
+            service,
+            "|",
+            banner
         )
 
 print()
-print("-" * 80)
+print("-" * 65)
 
 print(
     len(online_hosts),
     "hosts found"
 )
 
-print("=" * 80)
+print("=" * 65)
