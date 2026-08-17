@@ -236,27 +236,101 @@ def grab_http_banner(ip, port):
         return "Unknown"
 
 
+def parse_http_response(response):
+    if not response or response == "Unknown":
+        return {
+            "status_code": "Unknown",
+            "status": "Unknown",
+            "server": "Unknown",
+            "content_type": "Unknown"
+        }
+
+    lines = response.splitlines()
+
+    status_code = "Unknown"
+    status = "Unknown"
+    server = "Unknown"
+    content_type = "Unknown"
+
+    if lines:
+        parts = lines[0].split()
+
+        if len(parts) >= 2:
+            status_code = parts[1]
+
+            if len(parts) >= 3:
+                status = " ".join(parts[2:])
+
+    for line in lines[1:]:
+        if ":" not in line:
+            continue
+
+        key, value = line.split(
+            ":",
+            1
+        )
+
+        key = key.strip().lower()
+        value = value.strip()
+
+        if key == "server":
+            server = value
+
+        elif key == "content_type":
+            content_type = value
+
+    return {
+        "status_code": status_code,
+        "status": status,
+        "server": server,
+        "content_type": content_type
+    }
+
+
 def grab_https_banner(ip, port):
     try:
-        context = ssl.create_default_context()
-
-        with socket.create_connection(
+        sock = socket.create_connection(
             (str(ip), port),
-            timeout=3
-        ) as sock:
-            with context.wrap_socket(
-                sock,
-                server_hostname=str(ip)
-            ) as ssl_sock:
-                certificate = ssl_sock.getpeercert()
+            timeout=2
+        )
 
-                return {
-                    "tls_version": ssl_sock.version(),
-                    "cipher": ssl_sock.cipher(),
-                    "certificate": certificate
-                }
+        # First try: HEAD
+        request = (
+            "HEAD / HTTP/1.0\r\n"
+            f"Host: {ip}\r\n"
+            "Connection: close\r\n"
+            "\r\n"
+        )
 
-    except (socket.timeout, socket.error, ssl.SSLError):
+        sock.sendall(request.encode())
+
+        response = sock.recv(4096).decode(errors="ignore")
+
+        sock.close()
+
+        # If HEAD is rejected, try GET
+        if "400 Bad Request" in response or "405 Method Not Allowed" in response:
+            sock = socket.create_connection(
+                (str(ip), port),
+                timeout=2
+            )
+
+            request = (
+                "GET / HTTP/1.0\r\n"
+                f"Host: {ip}\r\n"
+                "Connection: close\r\n"
+                "\r\n"
+            )
+
+            sock.sendall(request.encode())
+
+            response = sock.recv(4096).decode(errors="ignore")
+
+            sock.close()
+
+        return response
+
+    except (socket.timeout, socket.error):
         return "Unknown"
 
 
@@ -461,14 +535,27 @@ for host in online_hosts:
 
         else:
 
-            banner = banner.splitlines()[0] if banner else "Unknown"
+            http_info = parse_http_response(banner)
 
             print(
                 " " * 18,
                 f"{port:<6}",
                 service,
                 "|",
-                banner
+                http_info["status_code"],
+                http_info["status"]
+            )
+
+            print(
+                " " * 25,
+                "Server:",
+                http_info["server"]
+            )
+
+            print(
+                " " * 25,
+                "Content-Type:",
+                http_info["content_type"]
             )
 
 print()
@@ -480,24 +567,3 @@ print(
 )
 
 print("=" * 65)
-
-#Example for HTTPS
-
-result = grab_https_banner("github.com", 443)
-
-print(result)
-
-result = grab_https_banner("github.com", 443)
-
-print("TLS Version:", result["tls_version"])
-print("Cipher:", result["cipher"])
-
-certificate_info = parse_certificate(
-    result["certificate"]
-)
-
-print("Subject:", certificate_info["subject"])
-print("Issuer:", certificate_info["issuer"])
-print("Valid from:", certificate_info["valid_from"])
-print("Valid until:", certificate_info["valid_until"])
-print("SAN:", ", ".join(certificate_info["san"]))
