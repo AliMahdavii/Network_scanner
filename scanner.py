@@ -164,3 +164,245 @@ class PortScanner:
                     open_ports.append(port)
 
         return open_ports
+
+
+class ServiceDetector:
+
+    common_services = {
+        21: "FTP",
+        22: "SSH",
+        23: "Telnet",
+        25: "SMTP",
+        53: "DNS",
+        80: "HTTP",
+        110: "POP3",
+        139: "NetBIOS",
+        443: "HTTPS",
+        445: "SMB",
+        3389: "RDP",
+        8080: "HTTP"
+    }
+
+    def get_service_name(self, port):
+        return self.common_services.get(
+            port,
+            "Unknown"
+        )
+
+    def grab_banner(self, ip, port):
+
+        try:
+            sock = socket.socket(
+                socket.AF_INET,
+                socket.SOCK_STREAM
+            )
+
+            sock.settimeout(2)
+
+            sock.connect((str(ip), port))
+
+            banner = sock.recv(1024)
+
+            sock.close()
+
+            return banner.decode(errors="ignore").strip()
+
+        except (socket.timeout, socket.error):
+
+            return "Unknown"
+
+    def grab_http_banner(self, ip, port):
+
+        try:
+            sock = socket.socket(
+                socket.AF_INET,
+                socket.SOCK_STREAM
+            )
+
+            sock.settimeout(2)
+
+            sock.connect((str(ip), port))
+
+            request = (
+                "HEAD / HTTP/1.0\r\n"
+                f"Host: {ip}\r\n"
+                "Connection: close\r\n"
+                "\r\n"
+            )
+
+            sock.sendall(request.encode())
+
+            response = sock.recv(4096)
+
+            sock.close()
+
+            return response.decode(errors="ignore").strip()
+
+        except (socket.timeout, socket.error):
+            return "Unknown"
+
+    def parse_http_response(self, response):
+
+        if not response or response == "Unknown":
+            return {
+                "status_code": "Unknown",
+                "status": "Unknown",
+                "server": "Unknown",
+                "content_type": "Unknown"
+            }
+
+        lines = response.splitlines()
+
+        status_code = "Unknown"
+        status = "Unknown"
+        server = "Unknown"
+        content_type = "Unknown"
+
+        if lines:
+            parts = lines[0].split()
+
+            if len(parts) >= 2:
+                status_code = parts[1]
+
+                if len(parts) >= 3:
+                    status = " ".join(parts[2:])
+
+        for line in lines[1:]:
+            if ":" not in line:
+                continue
+
+            key, value = line.split(
+                ":",
+                1
+            )
+
+            key = key.strip().lower()
+            value = value.strip()
+
+            if key == "server":
+                server = value
+
+            elif key == "content_type":
+                content_type = value
+
+        return {
+            "status_code": status_code,
+            "status": status,
+            "server": server,
+            "content_type": content_type
+        }
+
+    def grab_https_banner(self, ip, port):
+
+        try:
+            sock = socket.create_connection(
+                (str(ip), port),
+                timeout=2
+            )
+
+            # First try: HEAD
+            request = (
+                "HEAD / HTTP/1.0\r\n"
+                f"Host: {ip}\r\n"
+                "Connection: close\r\n"
+                "\r\n"
+            )
+
+            sock.sendall(request.encode())
+
+            response = sock.recv(4096).decode(errors="ignore")
+
+            sock.close()
+
+            # If HEAD is rejected, try GET
+            if "400 Bad Request" in response or "405 Method Not Allowed" in response:
+                sock = socket.create_connection(
+                    (str(ip), port),
+                    timeout=2
+                )
+
+                request = (
+                    "GET / HTTP/1.0\r\n"
+                    f"Host: {ip}\r\n"
+                    "Connection: close\r\n"
+                    "\r\n"
+                )
+
+                sock.sendall(request.encode())
+
+                response = sock.recv(4096).decode(errors="ignore")
+
+                sock.close()
+
+            return response
+
+        except (socket.timeout, socket.error):
+            return "Unknown"
+
+    def parse_certificate(self, certificate):
+
+        if not certificate:
+            return {
+                "subject": "Unknown",
+                "issuer": "Unknown",
+                "valid_from": "Unknown",
+                "valid_until": "Unknown",
+                "san": []
+            }
+
+        subject = certificate.get("subject", ())
+        issuer = certificate.get("issuer", ())
+
+        subject_name = "Unknown"
+        issuer_name = "Unknown"
+
+        for item in subject:
+            for key, value in item:
+                if key == "commonName":
+                    subject_name = value
+
+        for item in issuer:
+            for key, value in item:
+                if key == "commonName":
+                    issuer_name = value
+
+        valid_from = certificate.get(
+            "notBefore",
+            "Unknown"
+        )
+
+        valid_until = certificate.get(
+            "notAfter",
+            "Unknown"
+        )
+
+        san = certificate.get(
+            "subjectAltName",
+            ()
+        )
+
+        san_names = []
+
+        for name_type, name in san:
+            if name_type == "DNS":
+                san_names.append(name)
+
+        return {
+            "subject": subject_name,
+            "issuer": issuer_name,
+            "valid_from": valid_from,
+            "valid_until": valid_until,
+            "san": san_names
+        }
+
+    def detect_service(self, ip, port):
+
+        service = self.get_service_name(port)
+
+        if service == "HTTPS":
+            return self.grab_https_banner(ip, port)
+
+        if service == "HTTP":
+            return self.grab_http_banner(ip, port)
+
+        return self.grab_banner(ip, port)

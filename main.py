@@ -3,7 +3,12 @@ import ipaddress
 import subprocess
 import ssl
 
-from scanner import NetworkInfo, HostScanner, PortScanner
+from scanner import (
+    NetworkInfo,
+    HostScanner,
+    PortScanner,
+    ServiceDetector
+)
 
 from concurrent.futures import ThreadPoolExecutor
 
@@ -13,254 +18,12 @@ host_scanner = HostScanner()
 
 port_scanner = PortScanner()
 
+service_detectore = ServiceDetector()
+
 
 local_ip = network_info.local_ip
 
 network = network_info.network
-
-
-common_services = {
-    21: "FTP",
-    22: "SSH",
-    23: "Telnet",
-    25: "SMTP",
-    53: "DNS",
-    80: "HTTP",
-    110: "POP3",
-    139: "NetBIOS",
-    443: "HTTPS",
-    445: "SMB",
-    3389: "RDP",
-    8080: "HTTP"
-}
-
-
-def get_service_name(port):
-    return common_services.get(
-        port,
-        "Unknown"
-    )
-
-
-def grab_banner(ip, port):
-
-    try:
-        sock = socket.socket(
-            socket.AF_INET,
-            socket.SOCK_STREAM
-        )
-
-        sock.settimeout(2)
-
-        sock.connect((str(ip), port))
-
-        banner = sock.recv(1024)
-
-        sock.close()
-
-        return banner.decode(errors="ignore").strip()
-
-    except (socket.timeout, socket.error):
-
-        return "Unknown"
-
-
-def grab_http_banner(ip, port):
-    try:
-        sock = socket.socket(
-            socket.AF_INET,
-            socket.SOCK_STREAM
-        )
-
-        sock.settimeout(2)
-
-        sock.connect((str(ip), port))
-
-        request = (
-            "HEAD / HTTP/1.0\r\n"
-            f"Host: {ip}\r\n"
-            "Connection: close\r\n"
-            "\r\n"
-        )
-
-        sock.sendall(request.encode())
-
-        response = sock.recv(4096)
-
-        sock.close()
-
-        return response.decode(errors="ignore").strip()
-
-    except (socket.timeout, socket.error):
-        return "Unknown"
-
-
-def parse_http_response(response):
-    if not response or response == "Unknown":
-        return {
-            "status_code": "Unknown",
-            "status": "Unknown",
-            "server": "Unknown",
-            "content_type": "Unknown"
-        }
-
-    lines = response.splitlines()
-
-    status_code = "Unknown"
-    status = "Unknown"
-    server = "Unknown"
-    content_type = "Unknown"
-
-    if lines:
-        parts = lines[0].split()
-
-        if len(parts) >= 2:
-            status_code = parts[1]
-
-            if len(parts) >= 3:
-                status = " ".join(parts[2:])
-
-    for line in lines[1:]:
-        if ":" not in line:
-            continue
-
-        key, value = line.split(
-            ":",
-            1
-        )
-
-        key = key.strip().lower()
-        value = value.strip()
-
-        if key == "server":
-            server = value
-
-        elif key == "content_type":
-            content_type = value
-
-    return {
-        "status_code": status_code,
-        "status": status,
-        "server": server,
-        "content_type": content_type
-    }
-
-
-def grab_https_banner(ip, port):
-    try:
-        sock = socket.create_connection(
-            (str(ip), port),
-            timeout=2
-        )
-
-        # First try: HEAD
-        request = (
-            "HEAD / HTTP/1.0\r\n"
-            f"Host: {ip}\r\n"
-            "Connection: close\r\n"
-            "\r\n"
-        )
-
-        sock.sendall(request.encode())
-
-        response = sock.recv(4096).decode(errors="ignore")
-
-        sock.close()
-
-        # If HEAD is rejected, try GET
-        if "400 Bad Request" in response or "405 Method Not Allowed" in response:
-            sock = socket.create_connection(
-                (str(ip), port),
-                timeout=2
-            )
-
-            request = (
-                "GET / HTTP/1.0\r\n"
-                f"Host: {ip}\r\n"
-                "Connection: close\r\n"
-                "\r\n"
-            )
-
-            sock.sendall(request.encode())
-
-            response = sock.recv(4096).decode(errors="ignore")
-
-            sock.close()
-
-        return response
-
-    except (socket.timeout, socket.error):
-        return "Unknown"
-
-
-def parse_certificate(certificate):
-
-    if not certificate:
-        return {
-            "subject": "Unknown",
-            "issuer": "Unknown",
-            "valid_from": "Unknown",
-            "valid_until": "Unknown",
-            "san": []
-        }
-
-    subject = certificate.get("subject", ())
-    issuer = certificate.get("issuer", ())
-
-    subject_name = "Unknown"
-    issuer_name = "Unknown"
-
-    for item in subject:
-        for key, value in item:
-            if key == "commonName":
-                subject_name = value
-
-    for item in issuer:
-        for key, value in item:
-            if key == "commonName":
-                issuer_name = value
-
-    valid_from = certificate.get(
-        "notBefore",
-        "Unknown"
-    )
-
-    valid_until = certificate.get(
-        "notAfter",
-        "Unknown"
-    )
-
-    san = certificate.get(
-        "subjectAltName",
-        ()
-    )
-
-    san_names = []
-
-    for name_type, name in san:
-        if name_type == "DNS":
-            san_names.append(name)
-
-    return {
-        "subject": subject_name,
-        "issuer": issuer_name,
-        "valid_from": valid_from,
-        "valid_until": valid_until,
-        "san": san_names
-    }
-
-
-def detect_service(ip, port):
-
-    service = get_service_name(port)
-
-    if service == "HTTPS":
-        return grab_https_banner(ip, port)
-
-    if service == "HTTP":
-        return grab_http_banner(ip, port)
-
-    return grab_banner(ip, port)
 
 
 # Scan network
@@ -314,9 +77,9 @@ for host in host_scanner.online_hosts:
     host["banners"] = {}
 
     for port in host["open_ports"]:
-        host["services"][port] = get_service_name(port)
+        host["services"][port] = service_detectore.get_service_name(port)
 
-        host["banners"][port] = detect_service(ip, port)
+        host["banners"][port] = service_detectore.detect_service(ip, port)
 
 
 # Display results
@@ -359,7 +122,7 @@ for host in host_scanner.online_hosts:
                 banner["cipher"][0]
             )
 
-            certificate_info = parse_certificate(
+            certificate_info = service_detectore.parse_certificate(
                 banner["certificate"]
             )
 
@@ -395,7 +158,7 @@ for host in host_scanner.online_hosts:
 
         else:
 
-            http_info = parse_http_response(banner)
+            http_info = service_detectore.parse_http_response(banner)
 
             print(
                 " " * 18,
