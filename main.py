@@ -3,7 +3,7 @@ import ipaddress
 import subprocess
 import ssl
 
-from scanner import NetworkInfo, HostScanner
+from scanner import NetworkInfo, HostScanner, PortScanner
 
 from concurrent.futures import ThreadPoolExecutor
 
@@ -11,49 +11,12 @@ network_info = NetworkInfo()
 
 host_scanner = HostScanner()
 
+port_scanner = PortScanner()
+
 
 local_ip = network_info.local_ip
 
 network = network_info.network
-
-# Port scanner
-
-
-def validate_port(port):
-    if 0 <= port <= 65535:
-        return True
-
-    print("\nPort must be between 0 and 65535!\n")
-    return False
-
-
-def get_port_range():
-
-    while True:
-        try:
-            start_port = int(input("Start port: "))
-
-            if not validate_port(start_port):
-                continue
-
-            break
-
-        except ValueError:
-            print("\nPlease enter a valid number!\n")
-
-    while True:
-        try:
-            end_port = int(input("End port: "))
-
-            if not validate_port(end_port):
-                continue
-
-            break
-
-        except ValueError:
-            print("\nPlease enter a valid number!\n")
-
-    return range(start_port, end_port + 1)
 
 
 common_services = {
@@ -77,44 +40,6 @@ def get_service_name(port):
         port,
         "Unknown"
     )
-
-
-def scan_port(ip, port):
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
-    sock.settimeout(1)
-
-    result = sock.connect_ex((str(ip), port))
-
-    sock.close()
-
-    return result == 0
-
-
-def scan_port_tread(ip, port):
-    if scan_port(ip, port):
-        return port
-
-    return None
-
-
-def scan_ports(ip, ports):
-
-    open_ports = []
-
-    with ThreadPoolExecutor(max_workers=20) as executor:
-
-        results = executor.map(
-            lambda port: scan_port_tread(ip, port),
-            ports
-        )
-
-        for port in results:
-
-            if port is not None:
-                open_ports.append(port)
-
-    return open_ports
 
 
 def grab_banner(ip, port):
@@ -373,7 +298,7 @@ for host in host_scanner.online_hosts:
 
 # scan ports
 
-ports = get_port_range()
+ports = port_scanner.get_port_range()
 
 print()
 print("Scanning ports...")
@@ -383,7 +308,7 @@ for host in host_scanner.online_hosts:
 
     ip = host["ip"]
 
-    host["open_ports"] = scan_ports(ip, ports)
+    host["open_ports"] = port_scanner.scan_ports(ip, ports)
 
     host["services"] = {}
     host["banners"] = {}
