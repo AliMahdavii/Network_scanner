@@ -1,6 +1,7 @@
 import socket
 import ipaddress
 import subprocess
+import ssl
 
 from concurrent.futures import ThreadPoolExecutor
 
@@ -235,11 +236,38 @@ def grab_http_banner(ip, port):
         return "Unknown"
 
 
+def grab_https_banner(ip, port):
+    try:
+        context = ssl.create_default_context()
+
+        with socket.create_connection(
+            (str(ip), port),
+            timeout=3
+        ) as sock:
+            with context.wrap_socket(
+                sock,
+                server_hostname=str(ip)
+            ) as ssl_sock:
+                certificate = ssl_sock.getpeercert()
+
+                return {
+                    "tls_version": ssl_sock.version(),
+                    "cipher": ssl_sock.cipher(),
+                    "certificate": certificate
+                }
+
+    except (socket.timeout, socket.error, ssl.SSLError):
+        return "Unknown"
+
+
 def detect_service(ip, port):
 
     service = get_service_name(port)
 
-    if service in ["HTTP", "HTTPS"]:
+    if service == "HTTPS":
+        return grab_https_banner(ip, port)
+
+    if service == "HTTP":
         return grab_http_banner(ip, port)
 
     return grab_banner(ip, port)
@@ -323,13 +351,28 @@ for host in online_hosts:
             port,
             "Unknown"
         )
-        print(
-            " " * 18,
-            f"{port:<6}",
-            service,
-            "|",
-            banner
-        )
+
+        if isinstance(banner, dict):
+
+            print(
+                " " * 18,
+                f"{port:<6}",
+                service,
+                "| TLS:",
+                banner["tls_version"]
+            )
+
+        else:
+
+            banner = banner.splitlines()[0] if banner else "Unknown"
+
+            print(
+                " " * 18,
+                f"{port:<6}",
+                service,
+                "|",
+                banner
+            )
 
 print()
 print("-" * 65)
