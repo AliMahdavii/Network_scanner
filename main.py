@@ -3,20 +3,16 @@ import ipaddress
 import subprocess
 import ssl
 
+from scanner import NetworkInfo
+
 from concurrent.futures import ThreadPoolExecutor
 
-# Network
-
-sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
-sock.connect(("8.8.8.8", 80))
-
-local_ip = sock.getsockname()[0]
-
-sock.close()
+network_info = NetworkInfo()
 
 
-network = ipaddress.ip_network(local_ip + "/24", strict=False)
+local_ip = network_info.local_ip
+
+network = network_info.network
 
 # Ping
 
