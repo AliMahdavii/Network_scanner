@@ -260,6 +260,36 @@ def grab_https_banner(ip, port):
         return "Unknown"
 
 
+def parse_certificate(certificate):
+
+    if not certificate:
+        return {
+            "subject": "Unknown",
+            "issuer": "Unknown"
+        }
+
+    subject = certificate.get("subject", ())
+    issuer = certificate.get("issuer", ())
+
+    subject_name = "Unknown"
+    issuer_name = "Unknown"
+
+    for item in subject:
+        for key, value in item:
+            if key == "commonName":
+                subject_name = value
+
+    for item in issuer:
+        for key, value in item:
+            if key == "commonName":
+                issuer_name = value
+
+    return {
+        "subject": subject_name,
+        "issuer": issuer_name
+    }
+
+
 def detect_service(ip, port):
 
     service = get_service_name(port)
@@ -362,6 +392,28 @@ for host in online_hosts:
                 banner["tls_version"]
             )
 
+            print(
+                " " * 25,
+                "Cipher:",
+                banner["cipher"][0]
+            )
+
+            certificate_info = parse_certificate(
+                banner["certificate"]
+            )
+
+            print(
+                " " * 25,
+                "Subject:",
+                certificate_info["subject"]
+            )
+
+            print(
+                " " * 25,
+                "Issuer:",
+                certificate_info["issuer"]
+            )
+
         else:
 
             banner = banner.splitlines()[0] if banner else "Unknown"
@@ -383,3 +435,19 @@ print(
 )
 
 print("=" * 65)
+
+result = grab_https_banner("github.com", 443)
+
+print(result)
+
+result = grab_https_banner("github.com", 443)
+
+print("TLS Version:", result["tls_version"])
+print("Cipher:", result["cipher"])
+
+certificate_info = parse_certificate(
+    result["certificate"]
+)
+
+print("Subject:", certificate_info["subject"])
+print("Issuer:", certificate_info["issuer"])
