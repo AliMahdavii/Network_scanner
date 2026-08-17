@@ -265,7 +265,10 @@ def parse_certificate(certificate):
     if not certificate:
         return {
             "subject": "Unknown",
-            "issuer": "Unknown"
+            "issuer": "Unknown",
+            "valid_from": "Unknown",
+            "valid_until": "Unknown",
+            "san": []
         }
 
     subject = certificate.get("subject", ())
@@ -284,9 +287,33 @@ def parse_certificate(certificate):
             if key == "commonName":
                 issuer_name = value
 
+    valid_from = certificate.get(
+        "notBefore",
+        "Unknown"
+    )
+
+    valid_until = certificate.get(
+        "notAfter",
+        "Unknown"
+    )
+
+    san = certificate.get(
+        "subjectAltName",
+        ()
+    )
+
+    san_names = []
+
+    for name_type, name in san:
+        if name_type == "DNS":
+            san_names.append(name)
+
     return {
         "subject": subject_name,
-        "issuer": issuer_name
+        "issuer": issuer_name,
+        "valid_from": valid_from,
+        "valid_until": valid_until,
+        "san": san_names
     }
 
 
@@ -414,6 +441,24 @@ for host in online_hosts:
                 certificate_info["issuer"]
             )
 
+            print(
+                " " * 25,
+                "Valid From:",
+                certificate_info["valid_from"]
+            )
+
+            print(
+                " " * 25,
+                "Valid Until:",
+                certificate_info["valid_until"]
+            )
+
+            print(
+                " " * 25,
+                "SAN:",
+                ", ".join(certificate_info["san"])
+            )
+
         else:
 
             banner = banner.splitlines()[0] if banner else "Unknown"
@@ -436,6 +481,8 @@ print(
 
 print("=" * 65)
 
+#Example for HTTPS
+
 result = grab_https_banner("github.com", 443)
 
 print(result)
@@ -451,3 +498,6 @@ certificate_info = parse_certificate(
 
 print("Subject:", certificate_info["subject"])
 print("Issuer:", certificate_info["issuer"])
+print("Valid from:", certificate_info["valid_from"])
+print("Valid until:", certificate_info["valid_until"])
+print("SAN:", ", ".join(certificate_info["san"]))
