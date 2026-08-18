@@ -1,13 +1,9 @@
-import socket
-import ipaddress
-import subprocess
-import ssl
-
 from scanner import (
     NetworkInfo,
     HostScanner,
     PortScanner,
-    ServiceDetector
+    ServiceDetector,
+    ResultFormatter
 )
 
 from concurrent.futures import ThreadPoolExecutor
@@ -18,37 +14,24 @@ host_scanner = HostScanner()
 
 port_scanner = PortScanner()
 
-service_detectore = ServiceDetector()
+service_detector = ServiceDetector()
+
+formatter = ResultFormatter()
+
+# Header
+
+formatter.print_header(network_info)
 
 
-local_ip = network_info.local_ip
-
-network = network_info.network
-
-
-# Scan network
-
-
-print("=" * 65)
-print("                            NETWORK SCANNER")
-print("=" * 65)
-
-print()
-
-print("Local IP: ", local_ip)
-print("Network: ", network)
-print("Netmask: ", network.netmask)
-print("Broadcast: ", network.broadcast_address)
-
-print("\nScanning...\n")
+# Scan hosts
 
 with ThreadPoolExecutor(max_workers=20) as executor:
-    executor.map(host_scanner.scan_host, network.hosts())
+    executor.map(host_scanner.scan_host, network_info.network.hosts())
 
-
-# Get mac addresses
+# Get MAC addresses
 
 arp_table = host_scanner.get_arp_table()
+
 
 for host in host_scanner.online_hosts:
 
@@ -59,13 +42,13 @@ for host in host_scanner.online_hosts:
         "Unknown"
     )
 
-# scan ports
+
+# Get port range
 
 ports = port_scanner.get_port_range()
 
-print()
-print("Scanning ports...")
-print()
+
+# Scan ports and services
 
 for host in host_scanner.online_hosts:
 
@@ -77,116 +60,23 @@ for host in host_scanner.online_hosts:
     host["banners"] = {}
 
     for port in host["open_ports"]:
-        host["services"][port] = service_detectore.get_service_name(port)
+        host["services"][port] = service_detector.get_service_name(port)
 
-        host["banners"][port] = service_detectore.detect_service(ip, port)
+        host["banners"][port] = service_detector.detect_service(ip, port)
 
 
-# Display results
+# Display hosts
 
-print("IP ADDRESS".ljust(18), end="")
-print("HOSTNAME".ljust(21), end="")
-print("MAC ADDRESS")
+formatter.print_hosts(host_scanner.online_hosts)
 
-print("-" * 65)
 
+# Display services
 
 for host in host_scanner.online_hosts:
 
-    print(
-        host["ip"].ljust(18),
-        host["hostname"].ljust(21),
-        host["mac"].ljust(22)
-    )
+    formatter.print_services(host, service_detector)
 
-    for port, service in host["services"].items():
 
-        banner = host["banners"].get(
-            port,
-            "Unknown"
-        )
+# Footer
 
-        if isinstance(banner, dict):
-
-            print(
-                " " * 18,
-                f"{port:<6}",
-                service,
-                "| TLS:",
-                banner["tls_version"]
-            )
-
-            print(
-                " " * 25,
-                "Cipher:",
-                banner["cipher"][0]
-            )
-
-            certificate_info = service_detectore.parse_certificate(
-                banner["certificate"]
-            )
-
-            print(
-                " " * 25,
-                "Subject:",
-                certificate_info["subject"]
-            )
-
-            print(
-                " " * 25,
-                "Issuer:",
-                certificate_info["issuer"]
-            )
-
-            print(
-                " " * 25,
-                "Valid From:",
-                certificate_info["valid_from"]
-            )
-
-            print(
-                " " * 25,
-                "Valid Until:",
-                certificate_info["valid_until"]
-            )
-
-            print(
-                " " * 25,
-                "SAN:",
-                ", ".join(certificate_info["san"])
-            )
-
-        else:
-
-            http_info = service_detectore.parse_http_response(banner)
-
-            print(
-                " " * 18,
-                f"{port:<6}",
-                service,
-                "|",
-                http_info["status_code"],
-                http_info["status"]
-            )
-
-            print(
-                " " * 25,
-                "Server:",
-                http_info["server"]
-            )
-
-            print(
-                " " * 25,
-                "Content-Type:",
-                http_info["content_type"]
-            )
-
-print()
-print("-" * 65)
-
-print(
-    len(host_scanner.online_hosts),
-    "hosts found"
-)
-
-print("=" * 65)
+formatter.print_footer(host_scanner.online_hosts)
