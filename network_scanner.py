@@ -1,8 +1,8 @@
 from network_info import NetworkInfo
 from host_scanner import HostScanner
+from port_scanner import PortScanner
 
 from scanner import (
-    PortScanner,
     ServiceDetector
 )
 
