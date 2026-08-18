@@ -75,7 +75,7 @@ formatter.print_hosts(host_scanner.online_hosts)
 
 for host in host_scanner.online_hosts:
 
-    formatter.print_services(host, service_detector)
+    formatter.print_services(host)
 
 
 # Footer

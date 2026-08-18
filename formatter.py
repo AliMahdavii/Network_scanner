@@ -1,4 +1,16 @@
+from parsers import (
+    HTTPParsers,
+    TLSParser
+)
+
+
 class ResultFormatter:
+
+    def __init__(self):
+
+        self.http_parser = HTTPParsers()
+
+        self.tls_parser = TLSParser()
 
     def print_header(self, network_info):
 
@@ -43,7 +55,7 @@ class ResultFormatter:
 
         print("=" * 65)
 
-    def print_services(self, host, service_detector):
+    def print_services(self, host):
 
         for port, service in host["services"].items():
 
@@ -68,7 +80,7 @@ class ResultFormatter:
                     banner["cipher"][0]
                 )
 
-                certificate_info = service_detectore.parse_certificate(
+                certificate_info = self.tls_parser.parse_certificate(
                     banner["certificate"]
                 )
 
@@ -104,7 +116,7 @@ class ResultFormatter:
 
             else:
 
-                http_info = service_detector.parse_http_response(banner)
+                http_info = self.http_parser.parse(banner)
 
                 print(
                     " " * 18,
