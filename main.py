@@ -2,9 +2,10 @@ from scanner import (
     NetworkInfo,
     HostScanner,
     PortScanner,
-    ServiceDetector,
-    ResultFormatter
+    ServiceDetector
 )
+
+from formatter import ResultFormatter
 
 from concurrent.futures import ThreadPoolExecutor
 
