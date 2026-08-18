@@ -1,5 +1,6 @@
+from network_info import NetworkInfo
+
 from scanner import (
-    NetworkInfo,
     HostScanner,
     PortScanner,
     ServiceDetector
@@ -66,17 +67,15 @@ class NetworkScanner:
                 host["banners"][port] = self.service_detector.detect_service(
                     ip, port)
 
-
     def display_results(self):
 
         self.formatter.print_hosts(self.host_scanner.online_hosts)
 
         for host in self.host_scanner.online_hosts:
-        
+
             self.formatter.print_services(host)
 
         self.formatter.print_footer(self.host_scanner.online_hosts)
-
 
     def run(self):
 
