@@ -168,6 +168,9 @@ class PortScanner:
 
 class ServiceDetector:
 
+    def __init__(self):
+        self.banner_grabber = BannerGrabber()
+
     common_services = {
         21: "FTP",
         22: "SSH",
@@ -188,58 +191,6 @@ class ServiceDetector:
             port,
             "Unknown"
         )
-
-    def grab_banner(self, ip, port):
-
-        try:
-            sock = socket.socket(
-                socket.AF_INET,
-                socket.SOCK_STREAM
-            )
-
-            sock.settimeout(2)
-
-            sock.connect((str(ip), port))
-
-            banner = sock.recv(1024)
-
-            sock.close()
-
-            return banner.decode(errors="ignore").strip()
-
-        except (socket.timeout, socket.error):
-
-            return "Unknown"
-
-    def grab_http_banner(self, ip, port):
-
-        try:
-            sock = socket.socket(
-                socket.AF_INET,
-                socket.SOCK_STREAM
-            )
-
-            sock.settimeout(2)
-
-            sock.connect((str(ip), port))
-
-            request = (
-                "HEAD / HTTP/1.0\r\n"
-                f"Host: {ip}\r\n"
-                "Connection: close\r\n"
-                "\r\n"
-            )
-
-            sock.sendall(request.encode())
-
-            response = sock.recv(4096)
-
-            sock.close()
-
-            return response.decode(errors="ignore").strip()
-
-        except (socket.timeout, socket.error):
-            return "Unknown"
 
     def parse_http_response(self, response):
 
@@ -403,6 +354,61 @@ class ServiceDetector:
             return self.grab_https_banner(ip, port)
 
         if service == "HTTP":
-            return self.grab_http_banner(ip, port)
+            return self.banner_grabber.grab_http_banner(ip, port)
 
-        return self.grab_banner(ip, port)
+        return self.banner_grabber.grab_banner(ip, port)
+
+
+class BannerGrabber:
+
+    def grab_banner(self, ip, port):
+
+        try:
+            sock = socket.socket(
+                socket.AF_INET,
+                socket.SOCK_STREAM
+            )
+
+            sock.settimeout(2)
+
+            sock.connect((str(ip), port))
+
+            banner = sock.recv(1024)
+
+            sock.close()
+
+            return banner.decode(errors="ignore").strip()
+
+        except (socket.timeout, socket.error):
+
+            return "Unknown"
+
+    def grab_http_banner(self, ip, port):
+
+        try:
+            sock = socket.socket(
+                socket.AF_INET,
+                socket.SOCK_STREAM
+            )
+
+            sock.settimeout(2)
+
+            sock.connect((str(ip), port))
+
+            request = (
+                "HEAD / HTTP/1.0\r\n"
+                f"Host: {ip}\r\n"
+                "Connection: close\r\n"
+                "\r\n"
+            )
+
+            sock.sendall(request.encode())
+
+            response = sock.recv(4096)
+
+            sock.close()
+
+            return response.decode(errors="ignore").strip()
+
+        except (socket.timeout, socket.error):
+            return "Unknown"
