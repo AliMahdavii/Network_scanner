@@ -1,6 +1,7 @@
 import socket
 import ipaddress
 import subprocess
+import ssl
 
 from concurrent.futures import ThreadPoolExecutor
 
@@ -170,6 +171,7 @@ class ServiceDetector:
 
     def __init__(self):
         self.banner_grabber = BannerGrabber()
+        self.tls_scanner = TLSScanner()
 
     common_services = {
         21: "FTP",
@@ -243,53 +245,6 @@ class ServiceDetector:
             "content_type": content_type
         }
 
-    def grab_https_banner(self, ip, port):
-
-        try:
-            sock = socket.create_connection(
-                (str(ip), port),
-                timeout=2
-            )
-
-            # First try: HEAD
-            request = (
-                "HEAD / HTTP/1.0\r\n"
-                f"Host: {ip}\r\n"
-                "Connection: close\r\n"
-                "\r\n"
-            )
-
-            sock.sendall(request.encode())
-
-            response = sock.recv(4096).decode(errors="ignore")
-
-            sock.close()
-
-            # If HEAD is rejected, try GET
-            if "400 Bad Request" in response or "405 Method Not Allowed" in response:
-                sock = socket.create_connection(
-                    (str(ip), port),
-                    timeout=2
-                )
-
-                request = (
-                    "GET / HTTP/1.0\r\n"
-                    f"Host: {ip}\r\n"
-                    "Connection: close\r\n"
-                    "\r\n"
-                )
-
-                sock.sendall(request.encode())
-
-                response = sock.recv(4096).decode(errors="ignore")
-
-                sock.close()
-
-            return response
-
-        except (socket.timeout, socket.error):
-            return "Unknown"
-
     def parse_certificate(self, certificate):
 
         if not certificate:
@@ -351,12 +306,43 @@ class ServiceDetector:
         service = self.get_service_name(port)
 
         if service == "HTTPS":
-            return self.grab_https_banner(ip, port)
+            return self.tls_scanner.grab_https_banner(ip, port)
 
         if service == "HTTP":
             return self.banner_grabber.grab_http_banner(ip, port)
 
         return self.banner_grabber.grab_banner(ip, port)
+
+
+class TLSScanner:
+
+    def grab_https_banner(self, ip, port):
+
+        try:
+            context = ssl.create_default_context()
+
+            with socket.create_connection(
+                (str(ip), port),
+                timeout=2,
+            ) as raw_sock:
+
+                with context.wrap_socket(
+                    raw_sock,
+                    server_hostname=str(ip)
+                ) as sock:
+
+                    return {
+                        "tls_version": sock.version(),
+                        "cipher": sock.cipher(),
+                        "certificate": sock.getpeercert()
+                    }
+
+        except (
+            socket.timeout,
+            socket.error,
+            ssl.SSLError
+        ):
+            return "Unknown"
 
 
 class BannerGrabber:
