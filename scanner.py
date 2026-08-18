@@ -15,7 +15,7 @@ class NetworkInfo:
             strict=False
         )
 
-        self.netmask = self.network.broadcast_address
+        self.netmask = self.network.netmask
 
     def get_local_ip(self):
 
@@ -171,10 +171,44 @@ class PortScanner:
         return open_ports
 
 
+class HTTPScanner:
+
+    def grab_http_banner(self, ip, port):
+
+        try:
+            sock = socket.socket(
+                socket.AF_INET,
+                socket.SOCK_STREAM
+            )
+
+            sock.settimeout(2)
+
+            sock.connect((str(ip), port))
+
+            request = (
+                "HEAD / HTTP/1.0\r\n"
+                f"Host: {ip}\r\n"
+                "Connection: close\r\n"
+                "\r\n"
+            )
+
+            sock.sendall(request.encode())
+
+            response = sock.recv(4096)
+
+            sock.close()
+
+            return response.decode(errors="ignore").strip()
+
+        except (socket.timeout, socket.error):
+            return "Unknown"
+
+
 class ServiceDetector:
 
     def __init__(self):
         self.banner_grabber = BannerGrabber()
+        self.http_scanner = HTTPScanner()
         self.tls_scanner = TLSScanner()
 
     common_services = {
@@ -206,7 +240,7 @@ class ServiceDetector:
             return self.tls_scanner.grab_https_banner(ip, port)
 
         if service == "HTTP":
-            return self.banner_grabber.grab_http_banner(ip, port)
+            return self.http_scanner.grab_http_banner(ip, port)
 
         return self.banner_grabber.grab_banner(ip, port)
 
@@ -264,34 +298,4 @@ class BannerGrabber:
 
         except (socket.timeout, socket.error):
 
-            return "Unknown"
-
-    def grab_http_banner(self, ip, port):
-
-        try:
-            sock = socket.socket(
-                socket.AF_INET,
-                socket.SOCK_STREAM
-            )
-
-            sock.settimeout(2)
-
-            sock.connect((str(ip), port))
-
-            request = (
-                "HEAD / HTTP/1.0\r\n"
-                f"Host: {ip}\r\n"
-                "Connection: close\r\n"
-                "\r\n"
-            )
-
-            sock.sendall(request.encode())
-
-            response = sock.recv(4096)
-
-            sock.close()
-
-            return response.decode(errors="ignore").strip()
-
-        except (socket.timeout, socket.error):
             return "Unknown"
