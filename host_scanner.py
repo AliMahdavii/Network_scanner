@@ -1,6 +1,8 @@
 import subprocess
 import socket
 
+from models import Host
+
 
 class HostScanner:
 
@@ -54,7 +56,9 @@ class HostScanner:
 
             hostname = self.get_hostname(ip)
 
-            self.online_hosts.append({
-                "ip": str(ip),
-                "hostname": hostname
-            })
+            self.online_hosts.append(
+                Host(
+                    str(ip),
+                    hostname
+                )
+            )

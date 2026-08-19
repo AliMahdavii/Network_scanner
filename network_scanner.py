@@ -39,10 +39,8 @@ class NetworkScanner:
 
         for host in self.host_scanner.online_hosts:
 
-            ip = host["ip"]
-
-            host["mac"] = arp_table.get(
-                ip,
+            host.mac = arp_table.get(
+                host.ip,
                 "Unknown"
             )
 
@@ -50,19 +48,27 @@ class NetworkScanner:
 
         for host in self.host_scanner.online_hosts:
 
-            ip = host["ip"]
+            host.open_ports = (
+                self.port_scanner.scan_ports(
+                    host.ip,
+                    ports
+                )
+            )
 
-            host["open_ports"] = self.port_scanner.scan_ports(ip, ports)
+            for port in host.open_ports:
 
-            host["services"] = {}
-            host["banners"] = {}
+                host.services[port] = (
+                    self.service_detector
+                    .get_service_name(port)
+                )
 
-            for port in host["open_ports"]:
-                host["services"][port] = self.service_detector.get_service_name(
-                    port)
-
-                host["banners"][port] = self.service_detector.detect_service(
-                    ip, port)
+                host.banners[port] = (
+                    self.service_detector
+                    .detect_service(
+                        host.ip,
+                        port
+                    )
+                )
 
     def display_results(self):
 

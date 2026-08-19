@@ -38,9 +38,9 @@ class ResultFormatter:
         for host in hosts:
 
             print(
-                host["ip"].ljust(18),
-                host["hostname"].ljust(21),
-                host["mac"].ljust(22)
+                host.ip.ljust(18),
+                host.hostname.ljust(21),
+                host.mac.ljust(22)
             )
 
     def print_footer(self, hosts):
@@ -57,9 +57,9 @@ class ResultFormatter:
 
     def print_services(self, host):
 
-        for port, service in host["services"].items():
+        for port, service in host.services.items():
 
-            banner = host["banners"].get(
+            banner = host.banners.get(
                 port,
                 "Unknown"
             )
