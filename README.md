@@ -39,7 +39,7 @@ No external Python packages are required.
 
 ## 🏗️ Project Structure
 
-
+```text
 Network_scanner/
 │
 ├── main.py
